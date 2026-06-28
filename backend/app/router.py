@@ -150,3 +150,5 @@ class MaritimeRouter:
 
         path = a_star_search(self.graph, start_node, end_node, edge_weight, heuristic)
         return path
+
+

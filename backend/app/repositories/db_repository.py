@@ -1,8 +1,9 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, Column, Integer, Float, DateTime, Date, func
 from sqlalchemy.orm import sessionmaker
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 import math
+from datetime import datetime
 
 DATABASE_URL = "postgresql+psycopg2://vkr_user:vkr_password@localhost:5433/vkr_db"
 
@@ -24,7 +25,7 @@ class DatabaseRepository:
     ) -> List[List]:
         """Получение данных для тепловой карты с фильтрацией по дате и часу"""
         print(
-            f"📅 get_heatmap_data: start_date={start_date}, end_date={end_date}, start_hour={start_hour}, end_hour={end_hour}")
+            f"get_heatmap_data: start_date={start_date}, end_date={end_date}, start_hour={start_hour}, end_hour={end_hour}")
 
         with SessionLocal() as session:
             if source == "retrospective":
@@ -130,30 +131,52 @@ class DatabaseRepository:
                 for row in result
             ]
 
-    def get_traffic_density(self, hour=None):
-        query = """
-            SELECT center, hour_of_day, vessel_count, avg_speed
-            FROM traffic_density
-            WHERE 1=1
-        """
-        params = {}
+    # --- ИСПРАВЛЕННЫЙ МЕТОД get_traffic_density ---
+    def get_traffic_density(
+        self,
+        hour: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> List[Dict]:
+        """Получение данных о плотности трафика с фильтрацией по часу и дате"""
+        with SessionLocal() as session:
+            # Используем сырой SQL-запрос для гибкости
+            sql = """
+                SELECT 
+                    ST_Y(center::geometry) as lat,
+                    ST_X(center::geometry) as lon,
+                    vessel_count as intensity,
+                    hour_of_day as hour,
+                    date
+                FROM traffic_density
+                WHERE 1=1
+            """
+            params = {}
+            if hour is not None:
+                sql += " AND hour_of_day = :hour"
+                params["hour"] = hour
+            if start_date is not None:
+                sql += " AND date >= :start_date"
+                params["start_date"] = start_date
+            if end_date is not None:
+                sql += " AND date <= :end_date"
+                params["end_date"] = end_date
 
-        # Убираем фильтрацию по датам, так как таблица уже агрегирована по часам
-        if hour is not None:
-            query += " AND hour_of_day = %(hour)s"
-            params["hour"] = hour
-
-        result = session.execute(text(query), params)
-
-        return [
-            {
-                "center": {"lat": row.center.y, "lon": row.center.x},
-                "hour_of_day": row.hour_of_day,
-                "vessel_count": row.vessel_count,
-                "avg_speed": row.avg_speed
-            }
-            for row in result
-        ]
+            result = session.execute(text(sql), params)
+            rows = result.fetchall()
+            traffic = []
+            for row in rows:
+                if row.lat is not None and row.lon is not None:
+                    traffic.append({
+                        "lat": float(row.lat),
+                        "lon": float(row.lon),
+                        "intensity": int(row.intensity),
+                        "hour": row.hour,
+                        "date": str(row.date) if row.date else None
+                    })
+            print(f"Traffic density: {len(traffic)} points")
+            return traffic
+    # --- КОНЕЦ ИСПРАВЛЕННОГО МЕТОДА ---
 
     def get_weather_for_point(self, lat: float, lon: float, date: Optional[str] = None) -> Dict:
         """Получение погодных условий для точки"""

@@ -10,7 +10,7 @@ from app.config import MIN_LAT, MAX_LAT, MIN_LON, MAX_LON, GRID_STEP_M
 from app.router import MaritimeRouter
 from app.repositories.db_repository import DatabaseRepository, SessionLocal
 from sqlalchemy import text
-
+from pathlib import Path
 # --- ИМПОРТЫ ДЛЯ АВТОРИЗАЦИИ ---
 from app.auth import (
     UserCreate, UserLogin, Token, UserResponse,
@@ -20,31 +20,37 @@ from app.auth import (
 from datetime import timedelta
 import os
 
-
+from app.config import USE_DATABASE
+from app.repositories.file_repository import FileRepository
 
 # Глобальные переменные
 router = None
 db_repo = None
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Инициализация при старте"""
     global router, db_repo
 
-    try:
-        db_repo = DatabaseRepository()
-        print("✅ Database repository initialized")
-    except Exception as e:
-        print(f"❌ Failed to initialize database repository: {e}")
-        db_repo = None
+    if USE_DATABASE:
+        try:
+            db_repo = DatabaseRepository()
+            print("✅ Database repository initialized (PostgreSQL)")
+        except Exception as e:
+            print(f"❌ Failed to initialize database repository: {e}")
+            db_repo = None
+    else:
+        try:
+            db_repo = FileRepository()
+            print("✅ File repository initialized (Parquet/JSON)")
+        except Exception as e:
+            print(f"❌ Failed to initialize file repository: {e}")
+            db_repo = None
 
     router = MaritimeRouter(MIN_LAT, MAX_LAT, MIN_LON, MAX_LON, step_m=GRID_STEP_M)
     print("✅ Maritime router initialized")
     print("🚀 Application startup complete.")
 
     yield
-
     print("👋 Application shutting down...")
 
 
@@ -276,13 +282,15 @@ async def get_maritime_corridors():
 
 
 @app.get("/api/traffic_density")
-async def get_traffic_density(hour: Optional[int] = Query(None)):
+async def get_traffic_density(
+    hour: Optional[int] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None)
+):
     if db_repo is None:
         return {"traffic": []}
-
     try:
-        # Убираем фильтрацию по датам, так как таблица уже агрегирована по часам
-        traffic = db_repo.get_traffic_density(hour=hour)
+        traffic = db_repo.get_traffic_density(hour, start_date, end_date)
         return {"traffic": traffic}
     except Exception as e:
         print(f"Error loading traffic density: {e}")

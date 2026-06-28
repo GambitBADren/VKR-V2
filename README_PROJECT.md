@@ -1,29 +1,27 @@
 # Проект интеллектуальной морской маршрутизации
 
-## Быстрый запуск
+Система для планирования маршрутов морских судов с учётом ретроспективных AIS-данных, погодных условий и зон риска.
 
-1. Установите зависимости: `pip install -r requirements.txt`
-2. Сгенерируйте данные и обучите модели: `python train.py`
-3. Запустите API: `uvicorn app.main:app --reload`
-4. Откройте `frontend/index.html` в браузере (или через live-server)
+## Быстрый запуск (без PostgreSQL-урезанная версия)
 
-## Эндпоинты API
+1. Установите зависимости:
+   ```bash
+   pip install -r requirements.txt
+   cd frontend-react
+   npm install
 
-- `POST /api/route` – построить маршрут (start/end, vessel_type, optimization)
-- `POST /api/similar` – поиск похожих ситуаций (risk_score, wind, wave, vessel_type, season)
-- `GET /api/risk_zones` – получить зоны риска (JSON)
+2. Сгенерируйте синтетические данные и обучите ML-модели:
+python train.py
 
-## Структура
+3. Запустите бэкенд:
+python -m uvicorn app.main:app --reload
 
-- `app/synthetic_ais.py` – генерация 200k записей
-- `app/meteo.py` – синтез погоды
-- `app/risk_calculator.py` – вычисление risk_score
-- `app/ml/` – DBSCAN и k-NN
-- `app/router.py` – граф и A* (шаг сетки 10 км)
-- `train.py` – полный пайплайн обучения
-- `frontend/index.html` – карта Leaflet
+4. Запустите фронтенд (в отдельном терминале):
+cd frontend-react
+npm start
 
-## Примечания
+5. Откройте http://localhost:3000 в браузере.
 
-- Для проверки суши требуется скачать Natural Earth coastline (опционально). Пока заглушка.
-- Все данные синтетические, но архитектура готова к реальным CSV.
+
+
+

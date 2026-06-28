@@ -13,12 +13,9 @@ DATABASE_URL = "postgresql+psycopg2://vkr_user:vkr_password@localhost:5433/vkr_d
 
 def run_dbscan_on_risk_points():
     """Запуск DBSCAN на точках с высоким риском"""
-    print("🚀 Запуск DBSCAN для выявления зон риска...")
-
+    print(" Запуск DBSCAN для выявления зон риска...")
     engine = create_engine(DATABASE_URL)
-
-    # 1. Загружаем точки с высоким риском из БД
-    print("📊 Загрузка точек с risk_score > 0.5...")
+    print("Загрузка точек с risk_score > 0.5...")
     query = text("""
         SELECT 
             id,
@@ -29,26 +26,20 @@ def run_dbscan_on_risk_points():
         WHERE risk_score > 0.5
         LIMIT 50000
     """)
-
     with engine.connect() as conn:
         result = conn.execute(query)
         rows = result.fetchall()
-
     if not rows:
-        print("⚠️  Точек с высоким риском не найдено!")
+        print("Точек с высоким риском не найдено!")
         return
-
-    print(f"✅ Загружено {len(rows)} точек")
-
+    print(f"Загружено {len(rows)} точек")
     # 2. Преобразуем в numpy array
     coords = np.array([[row.lat, row.lon] for row in rows])
     risk_scores = np.array([row.risk_score for row in rows])
-
     # 3. Запускаем DBSCAN
     # ε = 20 км ≈ 0.18° (приблизительно)
-    # minPts = 5 (согласно REQ_D_04)
-    print("🔍 Запуск DBSCAN (eps=0.18°, minPts=5)...")
-
+    # minPts = 5
+    print(" Запуск DBSCAN (eps=0.18°, minPts=5)...")
     # Используем метрику haversine для географических координат
     # Переводим координаты в радианы
     coords_rad = np.radians(coords)
@@ -64,11 +55,11 @@ def run_dbscan_on_risk_points():
     n_clusters = len(unique_labels - {-1})
     n_noise = list(labels).count(-1)
 
-    print(f"✅ Найдено кластеров: {n_clusters}")
-    print(f"⚠️  Шумовых точек: {n_noise}")
+    print(f" Найдено кластеров: {n_clusters}")
+    print(f"  Шумовых точек: {n_noise}")
 
     # 5. Сохраняем кластеры в БД
-    print("💾 Сохранение зон риска в БД...")
+    print(" Сохранение зон риска в БД...")
 
     with engine.connect() as conn:
         # Очищаем старые зоны
